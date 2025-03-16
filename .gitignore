@@ -1,0 +1,17 @@
+venv
+.env
+DATA
+.vscode
+__pycache__
+*.pt
+IMAGES
+LIVEDATA
+*.mp4
+*.json
+.env
+.venv/
+.gitattributes
+*.pkl
+*.xlsx
+*.csv
+*.jpeg
