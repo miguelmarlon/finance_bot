@@ -40,6 +40,66 @@ def buscar_dados_empresas():
     data = pd.DataFrame(linhas[1:], columns = linhas[0])
     return data
 
+def calculando_dados_trimestrais(lista_de_empresas, dre_trimestral ,ano, contas_desejadas, dt_ini, dt_fim):
+    """
+Calcula dados trimestrais para uma lista de empresas e contas desejadas.
+
+Parâmetros:
+    lista_de_empresas (list): Lista de empresas a serem analisadas.
+    dre_trimestral (pd.DataFrame): DataFrame com os dados trimestrais.
+    ano (str): Ano dos dados (formato "YYYY").
+    contas_desejadas (list): Lista de contas a serem filtradas (ex.: ["Resultado Bruto", "Receita de Venda de Bens e/ou Serviços"]).
+    dt_ini (str): Data inicial do período (formato "MM-DD").
+    dt_fim (str): Data final do período (formato "MM-DD").
+    ordem_exerc (str): Ordem do exercício ("ÚLTIMO" ou "PENÚLTIMO").
+
+Retorna:
+    pd.DataFrame: DataFrame com os resultados organizados por empresa e conta.
+"""
+    resultados = []
+    for empresa in lista_de_empresas:
+        filtro = pd.Series(
+            (dre_trimestral["DT_INI_EXERC"] == f"{ano}-{dt_ini}") &
+            (dre_trimestral["DT_FIM_EXERC"] == f"{ano}-{dt_fim}") &
+            (dre_trimestral["ORDEM_EXERC"] == "ÚLTIMO") &
+            (dre_trimestral["DS_CONTA"].isin(contas_desejadas)) &
+            (dre_trimestral["DENOM_CIA"] == empresa)
+        )
+    
+    dados_filtrados = dre_trimestral.loc[filtro, ["DS_CONTA", "VL_AJUSTADO"]]
+    for conta in contas_desejadas:
+            valor = dados_filtrados.loc[dados_filtrados["DS_CONTA"] == conta, "VL_AJUSTADO"].sum()
+            resultados.append({
+                "Empresa": empresa,
+                "Conta": conta,
+                "Valor": valor,
+                "Ano": ano,
+                "Periodo": f"{ano}-{dt_ini} a {ano}-{dt_fim}"
+            })
+    return pd.DataFrame(resultados)
+
+def calculando_dados_anuais(lista_de_empresas, dre_anual, ano, contas_desejadas):
+    """
+    Calcula dados anuais para uma lista de empresas e contas desejadas.
+
+    Parâmetros:
+        lista_de_empresas (list): Lista de empresas a serem analisadas.
+        dre_anual (pd.DataFrame): DataFrame com os dados anuais.
+        ano (str): Ano dos dados (formato "YYYY").
+        contas_desejadas (list): Lista de contas a serem filtradas.
+
+    Retorna:
+        pd.DataFrame: DataFrame com os resultados organizados por empresa e conta.
+    """
+    return calculando_dados_trimestrais(
+        lista_de_empresas=lista_de_empresas,
+        dre_trimestral=dre_anual,
+        ano=ano,
+        contas_desejadas=contas_desejadas,
+        dt_ini="01-01",
+        dt_fim="12-31"
+    )
+
 def trim_to_dt_ini(trim):
     mapeamento = {"T1": "01-01", "T2": "04-01", "T3": "07-01"}
     return mapeamento.get(trim)
@@ -302,66 +362,6 @@ def criando_tabelas_dre_bpa_bpp(arquivos):
         retorno.append(bpp)
     
     return tuple(retorno)
-
-def calculando_dados_trimestrais(lista_de_empresas, dre_trimestral ,ano, contas_desejadas, dt_ini, dt_fim):
-    """
-Calcula dados trimestrais para uma lista de empresas e contas desejadas.
-
-Parâmetros:
-    lista_de_empresas (list): Lista de empresas a serem analisadas.
-    dre_trimestral (pd.DataFrame): DataFrame com os dados trimestrais.
-    ano (str): Ano dos dados (formato "YYYY").
-    contas_desejadas (list): Lista de contas a serem filtradas (ex.: ["Resultado Bruto", "Receita de Venda de Bens e/ou Serviços"]).
-    dt_ini (str): Data inicial do período (formato "MM-DD").
-    dt_fim (str): Data final do período (formato "MM-DD").
-    ordem_exerc (str): Ordem do exercício ("ÚLTIMO" ou "PENÚLTIMO").
-
-Retorna:
-    pd.DataFrame: DataFrame com os resultados organizados por empresa e conta.
-"""
-    resultados = []
-    for empresa in lista_de_empresas:
-        filtro = pd.Series(
-            (dre_trimestral["DT_INI_EXERC"] == f"{ano}-{dt_ini}") &
-            (dre_trimestral["DT_FIM_EXERC"] == f"{ano}-{dt_fim}") &
-            (dre_trimestral["ORDEM_EXERC"] == "ÚLTIMO") &
-            (dre_trimestral["DS_CONTA"].isin(contas_desejadas)) &
-            (dre_trimestral["DENOM_CIA"] == empresa)
-        )
-    
-    dados_filtrados = dre_trimestral.loc[filtro, ["DS_CONTA", "VL_AJUSTADO"]]
-    for conta in contas_desejadas:
-            valor = dados_filtrados.loc[dados_filtrados["DS_CONTA"] == conta, "VL_AJUSTADO"].sum()
-            resultados.append({
-                "Empresa": empresa,
-                "Conta": conta,
-                "Valor": valor,
-                "Ano": ano,
-                "Periodo": f"{ano}-{dt_ini} a {ano}-{dt_fim}"
-            })
-    return pd.DataFrame(resultados)
-
-def calculando_dados_anuais(lista_de_empresas, dre_anual, ano, contas_desejadas):
-    """
-    Calcula dados anuais para uma lista de empresas e contas desejadas.
-
-    Parâmetros:
-        lista_de_empresas (list): Lista de empresas a serem analisadas.
-        dre_anual (pd.DataFrame): DataFrame com os dados anuais.
-        ano (str): Ano dos dados (formato "YYYY").
-        contas_desejadas (list): Lista de contas a serem filtradas.
-
-    Retorna:
-        pd.DataFrame: DataFrame com os resultados organizados por empresa e conta.
-    """
-    return calculando_dados_trimestrais(
-        lista_de_empresas=lista_de_empresas,
-        dre_trimestral=dre_anual,
-        ano=ano,
-        contas_desejadas=contas_desejadas,
-        dt_ini="01-01",
-        dt_fim="12-31"
-    )
 
 def calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior, dre_anual, trimestre):
     contas_desejadas = [
