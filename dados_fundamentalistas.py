@@ -495,10 +495,12 @@ def calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_
 def calculando_divida_bruta_patrimonio_liquido(lista_de_empresas, n_empresas, bpp):
     pl_ajustado = pd.DataFrame()
     divida_bruta = pd.DataFrame()
+    bpp = bpp.set_index("DENOM_CIA")
     for i in range(0, n_empresas):
         empresa = lista_de_empresas[i]
         try:
-            dados_empresa = bpp[bpp["DENOM_CIA"] == empresa]
+            dados_empresa = bpp.query("DENOM_CIA == @empresa")
+            
             if dados_empresa.empty:
                 print(f"A empresa {empresa} não foi encontrada no DataFrame bpp.")
                 continue 
@@ -507,18 +509,20 @@ def calculando_divida_bruta_patrimonio_liquido(lista_de_empresas, n_empresas, bp
             dados_empresa.loc[dados_empresa["DS_CONTA"] == "Patrimônio Líquido Consolidado", "VL_AJUSTADO"].iloc[-1] -
             dados_empresa.loc[dados_empresa["DS_CONTA"] == "Participação dos Acionistas Não Controladores", "VL_AJUSTADO"].iloc[-1]
             )
+            
             pl_ajustado[empresa] = [pl_adj]
     
             dbpl = (
                 dados_empresa.loc[dados_empresa["DS_CONTA"] == "Empréstimos e Financiamentos", "VL_AJUSTADO"].iloc[-2] +
                 dados_empresa.loc[dados_empresa["DS_CONTA"] == "Empréstimos e Financiamentos", "VL_AJUSTADO"].iloc[0]
             )
+            
             divida_bruta[empresa] = [dbpl]
         except Exception as e:
             print(f"Erro ao processar a empresa {empresa}: {e}")
             continue
     divida_bruta_pl = divida_bruta/pl_ajustado
-    divida_bruta_pl
+    
     return divida_bruta_pl, pl_ajustado
 
 def calculando_caixa(lista_de_empresas, bpa):
@@ -741,17 +745,17 @@ ano_anterior = '2024'
 lista_de_empresas, n_empresas, dre_anual, dre_trimestral_ano_anterior, bpa_trimestral_ano_anterior, bpp_trimestral_ano_anterior, dre_trimestral_ano_corrente, bpa_trimestral_ano_corrente, bpp_trimestral_ano_corrente = processando_arquivos(primeiro_trimestre, lista_cvm_ativos, ano_corrente, ano_anterior)
 
 ##################
-margem_bruta = calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior, dre_anual, trimestres)
-print('Margem Bruta:')
-print(margem_bruta)
+# margem_bruta = calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior, dre_anual, trimestres)
+# print('Margem Bruta:')
+# print(margem_bruta)
 
-margem_liquida = calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior)
-print('Margem Liquida:')
-print(margem_liquida)
+# margem_liquida = calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior)
+# print('Margem Liquida:')
+# print(margem_liquida)
 
-# divida_bruta_pl, pl_ajustado = calculando_divida_bruta_patrimonio_liquido(lista_de_empresas,n_empresas, bpp_trimestral_ano_corrente)
-# print('Divida_bruta:')
-# print(divida_bruta_pl)
+divida_bruta_pl, pl_ajustado = calculando_divida_bruta_patrimonio_liquido(lista_de_empresas,n_empresas, bpp_trimestral_ano_anterior)
+print('Divida_bruta:')
+print(divida_bruta_pl)
 
 # caixa = calculando_caixa(lista_de_empresas, bpa_trimestral_ano_anterior)
 # print('Caixa:')
