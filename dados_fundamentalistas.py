@@ -40,12 +40,13 @@ def buscar_dados_empresas():
     data = pd.DataFrame(linhas[1:], columns = linhas[0])
     return data
 
-def calculando_dados_trimestrais(lista_de_empresas, dre_trimestral ,ano, contas_desejadas, dt_ini, dt_fim):
+def calculando_dados_trimestrais(empresa, dre_trimestral ,ano, contas_desejadas, dt_ini, dt_fim):
+    #QUANDO TERMINAR O PRIMEIRO TRIMESTRE ANALIZAR O CÓDIGO PARA VER COMO ELE VAI SE COMPORTAR COM 2 ANOS, 2024 E 2025, POR EXEMPLO.
     """
 Calcula dados trimestrais para uma lista de empresas e contas desejadas.
 
 Parâmetros:
-    lista_de_empresas (list): Lista de empresas a serem analisadas.
+    empresa (str): Empresa a ser analisada.
     dre_trimestral (pd.DataFrame): DataFrame com os dados trimestrais.
     ano (str): Ano dos dados (formato "YYYY").
     contas_desejadas (list): Lista de contas a serem filtradas (ex.: ["Resultado Bruto", "Receita de Venda de Bens e/ou Serviços"]).
@@ -57,15 +58,15 @@ Retorna:
     pd.DataFrame: DataFrame com os resultados organizados por empresa e conta.
 """
     resultados = []
-    for empresa in lista_de_empresas:
-        filtro = pd.Series(
-            (dre_trimestral["DT_INI_EXERC"] == f"{ano}-{dt_ini}") &
-            (dre_trimestral["DT_FIM_EXERC"] == f"{ano}-{dt_fim}") &
-            (dre_trimestral["ORDEM_EXERC"] == "ÚLTIMO") &
-            (dre_trimestral["DS_CONTA"].isin(contas_desejadas)) &
-            (dre_trimestral["DENOM_CIA"] == empresa)
-        )
     
+    filtro = pd.Series(
+        (dre_trimestral["DT_INI_EXERC"] == f"{ano}-{dt_ini}") &
+        (dre_trimestral["DT_FIM_EXERC"] == f"{ano}-{dt_fim}") &
+        (dre_trimestral["ORDEM_EXERC"] == "ÚLTIMO") &
+        (dre_trimestral["DS_CONTA"].isin(contas_desejadas)) &
+        (dre_trimestral["DENOM_CIA"] == empresa)
+    )
+
     dados_filtrados = dre_trimestral.loc[filtro, ["DS_CONTA", "VL_AJUSTADO"]]
     for conta in contas_desejadas:
             valor = dados_filtrados.loc[dados_filtrados["DS_CONTA"] == conta, "VL_AJUSTADO"].sum()
@@ -78,7 +79,7 @@ Retorna:
             })
     return pd.DataFrame(resultados)
 
-def calculando_dados_anuais(lista_de_empresas, dre_anual, ano, contas_desejadas):
+def calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas):
     """
     Calcula dados anuais para uma lista de empresas e contas desejadas.
 
@@ -92,7 +93,7 @@ def calculando_dados_anuais(lista_de_empresas, dre_anual, ano, contas_desejadas)
         pd.DataFrame: DataFrame com os resultados organizados por empresa e conta.
     """
     return calculando_dados_trimestrais(
-        lista_de_empresas=lista_de_empresas,
+        empresa=empresa,
         dre_trimestral=dre_anual,
         ano=ano,
         contas_desejadas=contas_desejadas,
@@ -375,12 +376,15 @@ def calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_
             periodo = trimestre
             ano, trim = trimestre.split("-")
             if trim == 'T4':
-                t1 = calculando_dados_trimestrais(lista_de_empresas, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '01-01', dt_fim= '03-31')
-                
-                t2 = calculando_dados_trimestrais(lista_de_empresas, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '04-01', dt_fim= '06-30')
-                t3 = calculando_dados_trimestrais(lista_de_empresas, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
-                anual = calculando_dados_anuais(lista_de_empresas, dre_anual, ano, contas_desejadas)
-    
+                t1 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '01-01', dt_fim= '03-31')
+                t2 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '04-01', dt_fim= '06-30')
+                t3 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
+                anual = calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas)
+                print(empresa)
+                print(t1)
+                print(t2)
+                print(t3)
+                print(anual)
                 resultado_bruto_t4 = (
                     extrair_valor_por_conta(anual, "Resultado Bruto") -
                     (
@@ -406,7 +410,7 @@ def calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_
                     margem_t4 = None  # Evita divisão por zero
                 resultados_empresa[periodo] = margem_t4
             else:
-                dados_periodo = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano,contas_desejadas, dt_ini=f"{trim_to_dt_ini(trim)}", dt_fim=f"{trim_to_dt_fim(trim)}")
+                dados_periodo = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini=f"{trim_to_dt_ini(trim)}", dt_fim=f"{trim_to_dt_fim(trim)}")
                 
                 resultado_bruto = extrair_valor_por_conta(dados_periodo, "Resultado Bruto")
                 receita_vendas = extrair_valor_por_conta(dados_periodo, "Receita de Venda de Bens e/ou Serviços")
@@ -422,15 +426,71 @@ def calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_
         df = df.dropna()
         df_resetado = df.reset_index()
         df_final = df_resetado.drop(columns=["index"])
+        df_final = df_final.head(1)
     return df_final
 
-def calculando_margem_liquida(lista_de_empresas, n_empresas, dre):
-    margem_liquida = pd.DataFrame()
-    for i in range(0, n_empresas):
-        calculo_margem_liq = pd.Series((dre.loc[lista_de_empresas[i],:].loc['Lucro/Prejuízo Consolidado do Período'].iloc[-1])/(dre.loc[lista_de_empresas[i],:].loc['Receita de Venda de Bens e/ou Serviços'].iloc[-1]))
-        margem_liquida = pd.concat([margem_liquida, calculo_margem_liq], axis=1)
-    margem_liquida.columns = lista_de_empresas
-    return margem_liquida
+def calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior):
+    contas_desejadas = [
+        'Lucro/Prejuízo Consolidado do Período',
+        'Receita de Venda de Bens e/ou Serviços'
+    ]
+    resultados = {}
+    for empresa in lista_de_empresas:
+        resultados_empresa = {}
+        for trimestre in trimestres:
+            periodo = trimestre
+            ano, trim = trimestre.split("-")
+            if trim == 'T4':
+                t1 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '01-01', dt_fim= '03-31')
+                t2 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '04-01', dt_fim= '06-30')
+                t3 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
+                anual = calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas)
+                
+                resultado_lucro_prej_t4 = (
+                    extrair_valor_por_conta(anual, 'Lucro/Prejuízo Consolidado do Período') -
+                    (
+                        extrair_valor_por_conta(t1, 'Lucro/Prejuízo Consolidado do Período') +
+                        extrair_valor_por_conta(t2, 'Lucro/Prejuízo Consolidado do Período') +
+                        extrair_valor_por_conta(t3, 'Lucro/Prejuízo Consolidado do Período')
+                    )
+                )
+                receita_vendas_t4 = (
+                    extrair_valor_por_conta(anual, "Receita de Venda de Bens e/ou Serviços") -
+                    (
+                        extrair_valor_por_conta(t1, "Receita de Venda de Bens e/ou Serviços") +
+                        extrair_valor_por_conta(t2, "Receita de Venda de Bens e/ou Serviços") +
+                        extrair_valor_por_conta(t3, "Receita de Venda de Bens e/ou Serviços")
+                    )
+                )
+                
+                # Calcula a margem liquida
+                if receita_vendas_t4 and receita_vendas_t4 != 0:
+                    margem_t4 = resultado_lucro_prej_t4 / receita_vendas_t4
+                else:
+                    margem_t4 = None  # Evita divisão por zero
+                resultados_empresa[periodo] = margem_t4
+                
+            else:
+                dados_periodo = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini=f"{trim_to_dt_ini(trim)}", dt_fim=f"{trim_to_dt_fim(trim)}")
+                
+                resultado_lucro_prej = extrair_valor_por_conta(dados_periodo, "Lucro/Prejuízo Consolidado do Período")
+                receita_vendas = extrair_valor_por_conta(dados_periodo, "Receita de Venda de Bens e/ou Serviços")
+
+                if receita_vendas and receita_vendas != 0:
+
+                    margem = resultado_lucro_prej / receita_vendas
+                else:
+                    margem = None  # Evita divisão por zero
+                resultados_empresa[periodo] = margem
+        resultados[empresa] = resultados_empresa
+        
+    df = pd.DataFrame.from_dict(resultados, orient="index")
+    df = pd.DataFrame.from_dict(resultados, orient="columns")
+    df = df.dropna()
+    df_resetado = df.reset_index()
+    df_final = df_resetado.drop(columns=["index"])
+    df_final = df_final.head(1)
+    return df_final
 
 def calculando_divida_bruta_patrimonio_liquido(lista_de_empresas, n_empresas, bpp):
     pl_ajustado = pd.DataFrame()
@@ -685,10 +745,9 @@ margem_bruta = calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_cor
 print('Margem Bruta:')
 print(margem_bruta)
 
-
-# margem_liquida = calculando_margem_liquida(lista_de_empresas,n_empresas, dre_trimestral_ano_corrente)
-# print('Margem Liquida:')
-# print(margem_liquida)
+margem_liquida = calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior)
+print('Margem Liquida:')
+print(margem_liquida)
 
 # divida_bruta_pl, pl_ajustado = calculando_divida_bruta_patrimonio_liquido(lista_de_empresas,n_empresas, bpp_trimestral_ano_corrente)
 # print('Divida_bruta:')
