@@ -534,14 +534,14 @@ def calculando_caixa(lista_de_empresas, bpa):
         
         if empresa in bpa.index:
             filtro = (bpa.index == empresa) & (bpa['DS_CONTA'].isin(['Caixa e Equivalentes de Caixa', 'Aplicações Financeiras']))
-            
-            dados_filtrados = bpa.loc[filtro, ['DS_CONTA', 'VL_AJUSTADO', 'DT_AJUSTADO']]
+            dados_filtrados = bpa.loc[filtro, ['DS_CONTA','ORDEM_EXERC', 'VL_AJUSTADO', 'DT_AJUSTADO']]
             
             if not dados_filtrados.empty:
-                dados_filtrados = dados_filtrados.sort_values(by='DT_REFER', ascending=False).drop_duplicates(subset=['DS_CONTA'])
-            
-                valores = {conta: dados_filtrados.loc[dados_filtrados['DS_CONTA'] == conta, 'VL_AJUSTADO'].iloc[0] 
-                    for conta in dados_filtrados['DS_CONTA'].unique()}
+                dados_filtrados = dados_filtrados.sort_values(by='DT_AJUSTADO', ascending=False) 
+                dados_filtrados_ = dados_filtrados[dados_filtrados['ORDEM_EXERC'] != 'PENÚLTIMO']
+                print(dados_filtrados_)
+                valores = {conta: dados_filtrados_.loc[dados_filtrados_['DS_CONTA'] == conta, 'VL_AJUSTADO'].iloc[0] 
+                    for conta in dados_filtrados_['DS_CONTA'].unique()}
                 
                 caixa[empresa] = valores
                 
@@ -753,13 +753,13 @@ lista_de_empresas, n_empresas, dre_anual, dre_trimestral_ano_anterior, bpa_trime
 # print('Margem Liquida:')
 # print(margem_liquida)
 
-divida_bruta_pl, pl_ajustado = calculando_divida_bruta_patrimonio_liquido(lista_de_empresas,n_empresas, bpp_trimestral_ano_anterior)
-print('Divida_bruta:')
-print(divida_bruta_pl)
+# divida_bruta_pl, pl_ajustado = calculando_divida_bruta_patrimonio_liquido(lista_de_empresas,n_empresas, bpp_trimestral_ano_anterior)
+# print('Divida_bruta:')
+# print(divida_bruta_pl)
 
-# caixa = calculando_caixa(lista_de_empresas, bpa_trimestral_ano_anterior)
-# print('Caixa:')
-# print(caixa)
+caixa = calculando_caixa(lista_de_empresas, bpa_trimestral_ano_anterior)
+print('Caixa:')
+print(caixa)
 
 # liquidez_corrente = calculando_liquidez_corrente(lista_de_empresas,n_empresas, bpa_trimestral_ano_corrente)
 # print('Liquidez corrente:')
