@@ -539,7 +539,7 @@ def calculando_caixa(lista_de_empresas, bpa):
             if not dados_filtrados.empty:
                 dados_filtrados = dados_filtrados.sort_values(by='DT_AJUSTADO', ascending=False) 
                 dados_filtrados_ = dados_filtrados[dados_filtrados['ORDEM_EXERC'] != 'PENÚLTIMO']
-                print(dados_filtrados_)
+                
                 valores = {conta: dados_filtrados_.loc[dados_filtrados_['DS_CONTA'] == conta, 'VL_AJUSTADO'].iloc[0] 
                     for conta in dados_filtrados_['DS_CONTA'].unique()}
                 
@@ -556,11 +556,61 @@ def calculando_caixa(lista_de_empresas, bpa):
 
 def calculando_liquidez_corrente(lista_de_empresas, n_empresas, bpa, bpp):
     liquidez_corrente = pd.DataFrame()
-    for i in range(0, n_empresas):
-        liq_corrente = pd.Series((bpa.loc[lista_de_empresas[i],:].loc['Ativo Circulante'].iloc[-1])/(bpp.loc[lista_de_empresas[i],:].loc['Passivo Circulante'].iloc[-1,3]))
-        liquidez_corrente = pd.concat([liquidez_corrente, liq_corrente], axis=1)
-    liquidez_corrente.columns = lista_de_empresas
+    ativo_circ = pd.DataFrame()
+    passivo_circ = pd.DataFrame()
+    bpa = bpa.set_index("DENOM_CIA")
+    bpp = bpp.set_index("DENOM_CIA")
+    
+
+    for empresa in lista_de_empresas:
+        if empresa in bpa.index:
+            filtro = (bpa.index == empresa) & (bpa['DS_CONTA'].isin(['Ativo Circulante']))
+            dados_filtrados = bpa.loc[filtro, ['DS_CONTA','ORDEM_EXERC', 'VL_AJUSTADO', 'DT_AJUSTADO']]
+            
+            if not dados_filtrados.empty:
+                dados_filtrados = dados_filtrados.sort_values(by='DT_AJUSTADO', ascending=False) 
+                dados_filtrados_ = dados_filtrados[dados_filtrados['ORDEM_EXERC'] != 'PENÚLTIMO']
+                
+                valores = {conta: dados_filtrados_.loc[dados_filtrados_['DS_CONTA'] == conta, 'VL_AJUSTADO'].iloc[0] 
+                    for conta in dados_filtrados_['DS_CONTA'].unique()}
+                
+                ativo_circ[empresa] = valores
+                
+            else:
+                print(f"Nenhum dado encontrado para a empresa '{empresa}'.")
+        else:
+            print(f"A empresa '{empresa}' não foi encontrada no DataFrame 'bpa'.")
+
+    for empresa in lista_de_empresas:
+        if empresa in bpp.index:
+            filtro = (bpp.index == empresa) & (bpp['DS_CONTA'].isin(['Passivo Circulante']))
+            dados_filtrados = bpp.loc[filtro, ['DS_CONTA','ORDEM_EXERC', 'VL_AJUSTADO', 'DT_AJUSTADO']]
+            
+            if not dados_filtrados.empty:
+                dados_filtrados = dados_filtrados.sort_values(by='DT_AJUSTADO', ascending=False) 
+                dados_filtrados_ = dados_filtrados[dados_filtrados['ORDEM_EXERC'] != 'PENÚLTIMO']
+                
+                valores = {conta: dados_filtrados_.loc[dados_filtrados_['DS_CONTA'] == conta, 'VL_AJUSTADO'].iloc[0] 
+                    for conta in dados_filtrados_['DS_CONTA'].unique()}
+                
+                passivo_circ[empresa] = valores
+                
+            else:
+                print(f"Nenhum dado encontrado para a empresa '{empresa}'.")
+        else:
+            print(f"A empresa '{empresa}' não foi encontrada no DataFrame 'bpa'.")
+    ativo_circ = ativo_circ.reset_index().drop(columns='index')
+    passivo_circ = passivo_circ.reset_index().drop(columns='index')
+    print(ativo_circ)
+    print(passivo_circ)
+    liquidez_corrente = ativo_circ/passivo_circ
     return liquidez_corrente
+    
+    # for i in range(0, n_empresas):
+    #     liq_corrente = pd.Series((bpa.loc[lista_de_empresas[i],:].loc['Ativo Circulante'].iloc[-1])/(bpp.loc[lista_de_empresas[i],:].loc['Passivo Circulante'].iloc[-1,3]))
+    #     liquidez_corrente = pd.concat([liquidez_corrente, liq_corrente], axis=1)
+    # liquidez_corrente.columns = lista_de_empresas
+    # return liquidez_corrente
 
 def calculando_ebit(lista_de_empresas, n_empresas, dre):
     # ebit_ajustado = pd.DataFrame()
@@ -757,13 +807,13 @@ lista_de_empresas, n_empresas, dre_anual, dre_trimestral_ano_anterior, bpa_trime
 # print('Divida_bruta:')
 # print(divida_bruta_pl)
 
-caixa = calculando_caixa(lista_de_empresas, bpa_trimestral_ano_anterior)
-print('Caixa:')
-print(caixa)
+# caixa = calculando_caixa(lista_de_empresas, bpa_trimestral_ano_anterior)
+# print('Caixa:')
+# print(caixa)
 
-# liquidez_corrente = calculando_liquidez_corrente(lista_de_empresas,n_empresas, bpa_trimestral_ano_corrente)
-# print('Liquidez corrente:')
-# print(liquidez_corrente)
+liquidez_corrente = calculando_liquidez_corrente(lista_de_empresas,n_empresas, bpa_trimestral_ano_anterior, bpp_trimestral_ano_anterior)
+print('Liquidez corrente:')
+print(liquidez_corrente)
 
 # ebit = calculando_ebit(lista_de_empresas, n_empresas, dre_trimestral_ano_corrente)
 # print('EBIT:')
