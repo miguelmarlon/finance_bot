@@ -717,9 +717,9 @@ def calculando_roe(lista_de_empresas, n_empresas, bpp_trimestral_ano_anterior, b
         #quando virar o trimestre preciso testar essa parte do código
         resultados_lista = []
         for empresa in lista_de_empresas:
-            resultados_empresa = pd.DataFrame()
             periodo_resultado = {'Empresa': empresa}
             periodo_resultado['Empresa'] = empresa
+            
             for trimestre in trimestres:
                 periodo = trimestre
                 ano, trim = trimestre.split("-")
@@ -764,40 +764,72 @@ def calculando_ebit_ano(lista_de_empresas, dre_trimestral_ano_anterior, dre_anua
     # EBIT ANO
     # É A SOMA DA RECEITA LIQUIDA DOS ÚLTIMOS 4 TRIMESTRES
     #estou em março 2025, portanto devo considerar os 4 trimestres do ano anterior
-
-    for trimestre in trimestres:
-        ano, trim = trimestre.split("-")
-        if trim != 'T4':
-            if trim == 'T1':
-                dt_ini = '01-01'
-                dt_fim = '03-31'
-                liq_t1 = calculando_dados_trimestrais(lista_de_empresas, dre_trimestral_ano_anterior, ano, dt_ini, dt_fim)
-                
-            if trim == 'T2':
-                dt_ini = '04-01'
-                dt_fim = '06-30'
-                liq_t2 = calculando_dados_trimestrais(lista_de_empresas, dre_trimestral_ano_anterior, ano, dt_ini, dt_fim)
-                
-            if trim == 'T3':
-                dt_ini = '07-01'
-                dt_fim = '09-30'
-                liq_t3 = calculando_dados_trimestrais(lista_de_empresas, dre_trimestral_ano_anterior, ano, dt_ini, dt_fim)
-                
-        else:
-            liq_ano = calculando_dados_anuais(lista_de_empresas, dre_anual, ano)
+    contas_desejadas = [
+            'Receita de Venda de Bens e/ou Serviços',
+            'Custo dos Bens e/ou Serviços Vendidos',
+            'Despesas com Vendas',
+            'Despesas Gerais e Administrativas'
+        ]
+    resultados = pd.DataFrame()
+    df_final = pd.DataFrame()
+    ano, trim = trimestres[0].split("-")
+    if trimestres[0] == f'{ano}-T4':
+        for empresa in lista_de_empresas:
+            resultados_empresa = pd.DataFrame()
+            periodo_resultado = calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas)
+            resultados_empresa = pd.DataFrame(periodo_resultado)
+            resultados_empresa['Ebit_ano'] = resultados_empresa['Valor'].sum()
+            resultados = pd.concat([resultados, resultados_empresa.head(1)], ignore_index=True)
             
-   
-    liq_t3 = liq_t3.set_index("Empresa")
-    liq_ano = liq_ano.set_index("Empresa")
-    liq_t4 = liq_ano - liq_t3
-    
-    liq_t1 = liq_t1.set_index("Empresa")
-    liq_t2 = liq_t2.set_index("Empresa")
-    
-    ebit_ano = liq_t1 + liq_t2 + liq_t3 + liq_t4
-    
-    ebit_ano = ebit_ano.T.reset_index(drop=True)
-    return ebit_ano      
+        df_final = pd.concat([df_final, resultados], ignore_index=True)
+        df_final = df_final.drop(columns=['Conta', 'Valor', 'Ano', 'Periodo'])
+        return df_final
+    else:
+        resultados_lista = []
+        for empresa in lista_de_empresas:
+
+            periodo_resultado = {'Empresa': empresa}
+            periodo_resultado['Empresa'] = empresa
+            for trimestre in trimestres:
+                ano, trim = trimestre.split("-")
+                if trim == 'T1':
+                    dt_ini = '01-01'
+                    dt_fim = '03-31'
+                    liq_t1 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini, dt_fim)
+                    liq_t1 = extrair_valor_por_conta(liq_t1, contas_desejadas)
+                    periodo_resultado['liq_t1'] = float(liq_t1)
+                elif trim == 'T2':
+                    dt_ini = '04-01'
+                    dt_fim = '06-30'
+                    liq_t2 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini, dt_fim)
+                    liq_t2 = extrair_valor_por_conta(liq_t2, contas_desejadas)
+                    periodo_resultado['liq_t2'] = float(liq_t2)
+                elif trim == 'T3':
+                    dt_ini = '07-01'
+                    dt_fim = '09-30'
+                    liq_t3 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini, dt_fim)
+                    liq_t3 = extrair_valor_por_conta(liq_t3, contas_desejadas)
+                    periodo_resultado['liq_t3'] = float(liq_t3)
+                else:
+                    t1_para_t4 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '01-01', dt_fim= '03-31')
+                    t2_para_t4 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '04-01', dt_fim= '06-30')
+                    t3_para_t4 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
+                    anual_para_t4 = calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas)
+                    liq_t4 = (
+                                extrair_valor_por_conta(anual_para_t4, contas_desejadas) -
+                                (
+                                    extrair_valor_por_conta(t1_para_t4, contas_desejadas) +
+                                    extrair_valor_por_conta(t2_para_t4, contas_desejadas) +
+                                    extrair_valor_por_conta(t3_para_t4, contas_desejadas)
+                                )
+                            )
+                    periodo_resultado['liq_t4'] = float(liq_t4)
+                resultados_lista.append(periodo_resultado)
+            df= pd.DataFrame(resultados_lista)
+            df = df.groupby('Empresa', as_index=False).first()
+        df['ebit_ano'] = df[['liq_t1', 'liq_t2', 'liq_t3', 'liq_t4']].sum(axis=1)
+        ebit_ano = df.drop(columns=['liq_t1', 'liq_t2', 'liq_t3', 'liq_t4'])
+        return ebit_ano
   
 def calculando_ebit_ativo(ebit_ano, bpa, lista_de_empresas):
     
@@ -864,14 +896,14 @@ lista_de_empresas, n_empresas, dre_anual, bpa_anual, bpp_anual, dre_trimestral_a
 # print('EBIT:')
 # print(ebit)
 
-roe = calculando_roe(lista_de_empresas, n_empresas, bpp_trimestral_ano_anterior, bpp_trimestral_ano_corrente, 
-                     dre_trimestral_ano_anterior, dre_trimestral_ano_corrente, dre_anual, bpp_anual)
-print('ROE:')
-print(roe)
+# roe = calculando_roe(lista_de_empresas, n_empresas, bpp_trimestral_ano_anterior, bpp_trimestral_ano_corrente, 
+#                      dre_trimestral_ano_anterior, dre_trimestral_ano_corrente, dre_anual, bpp_anual)
+# print('ROE:')
+# print(roe)
 
-# ebit_ano = calculando_ebit_ano(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, trimestres)
-# print('EBIT ANO:')
-# print(ebit_ano)
+ebit_ano = calculando_ebit_ano(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, trimestres)
+print('EBIT ANO:')
+print(ebit_ano)
 
 # ebit_ativo = calculando_ebit_ativo(ebit_ano, bpa_trimestral_ano_corrente, lista_de_empresas)
 # print('EBIT ATIVO:')
