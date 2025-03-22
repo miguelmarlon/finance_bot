@@ -40,7 +40,7 @@ def buscar_dados_empresas():
     data = pd.DataFrame(linhas[1:], columns = linhas[0])
     return data
 
-def calculando_dados_trimestrais(empresa, dre_trimestral ,ano, contas_desejadas, dt_ini, dt_fim):
+def calculando_dados_trimestrais(empresa, tabela ,ano, contas_desejadas, dt_ini, dt_fim):
     #QUANDO TERMINAR O PRIMEIRO TRIMESTRE ANALIZAR O CÓDIGO PARA VER COMO ELE VAI SE COMPORTAR COM 2 ANOS, 2024 E 2025, POR EXEMPLO.
     """
 Calcula dados trimestrais para uma lista de empresas e contas desejadas.
@@ -58,16 +58,22 @@ Retorna:
     pd.DataFrame: DataFrame com os resultados organizados por empresa e conta.
 """
     resultados = []
-    
-    filtro = pd.Series(
-        (dre_trimestral["DT_INI_EXERC"] == f"{ano}-{dt_ini}") &
-        (dre_trimestral["DT_FIM_EXERC"] == f"{ano}-{dt_fim}") &
-        (dre_trimestral["ORDEM_EXERC"] == "ÚLTIMO") &
-        (dre_trimestral["DS_CONTA"].isin(contas_desejadas)) &
-        (dre_trimestral["DENOM_CIA"] == empresa)
-    )
-
-    dados_filtrados = dre_trimestral.loc[filtro, ["DS_CONTA", "VL_AJUSTADO"]]
+    if "DT_INI_EXERC" in tabela.columns:
+        filtro = pd.Series(
+            (tabela["DT_INI_EXERC"] == f"{ano}-{dt_ini}") &
+            (tabela["DT_FIM_EXERC"] == f"{ano}-{dt_fim}") &
+            (tabela["ORDEM_EXERC"] == "ÚLTIMO") &
+            (tabela["DS_CONTA"].isin(contas_desejadas)) &
+            (tabela["DENOM_CIA"] == empresa)
+        )
+    else:
+        filtro = pd.Series(
+            (tabela["DT_FIM_EXERC"] == f"{ano}-{dt_fim}") &
+            (tabela["ORDEM_EXERC"] == "ÚLTIMO") &
+            (tabela["DS_CONTA"].isin(contas_desejadas)) &
+            (tabela["DENOM_CIA"] == empresa)
+        )
+    dados_filtrados = tabela.loc[filtro, ["DS_CONTA", "VL_AJUSTADO"]]
     for conta in contas_desejadas:
             valor = dados_filtrados.loc[dados_filtrados["DS_CONTA"] == conta, "VL_AJUSTADO"].sum()
             resultados.append({
@@ -79,7 +85,7 @@ Retorna:
             })
     return pd.DataFrame(resultados)
 
-def calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas):
+def calculando_dados_anuais(empresa, tabela_anual, ano, contas_desejadas):
     """
     Calcula dados anuais para uma lista de empresas e contas desejadas.
 
@@ -94,7 +100,7 @@ def calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas):
     """
     return calculando_dados_trimestrais(
         empresa=empresa,
-        dre_trimestral=dre_anual,
+        tabela=tabela_anual,
         ano=ano,
         contas_desejadas=contas_desejadas,
         dt_ini="01-01",
@@ -380,11 +386,7 @@ def calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_
                 t2 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '04-01', dt_fim= '06-30')
                 t3 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
                 anual = calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas)
-                print(empresa)
-                print(t1)
-                print(t2)
-                print(t3)
-                print(anual)
+                
                 resultado_bruto_t4 = (
                     extrair_valor_por_conta(anual, "Resultado Bruto") -
                     (
@@ -427,7 +429,8 @@ def calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_
         df_resetado = df.reset_index()
         df_final = df_resetado.drop(columns=["index"])
         df_final = df_final.head(1)
-    return df_final
+        margem_bruta = df_final.melt(var_name="Empresa", value_name="Margem_bruta")
+    return margem_bruta
 
 def calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior):
     contas_desejadas = [
@@ -490,7 +493,8 @@ def calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_
     df_resetado = df.reset_index()
     df_final = df_resetado.drop(columns=["index"])
     df_final = df_final.head(1)
-    return df_final
+    margem_liquida = df_final.melt(var_name="Empresa", value_name="Margem_liquida")
+    return margem_liquida
 
 def calculando_divida_bruta_patrimonio_liquido(lista_de_empresas, n_empresas, bpp):
     #criar uma lógica para calcular o valor do 4t
@@ -524,7 +528,8 @@ def calculando_divida_bruta_patrimonio_liquido(lista_de_empresas, n_empresas, bp
             continue
     divida_bruta_pl = divida_bruta/pl_ajustado
     
-    return divida_bruta_pl, pl_ajustado
+    df_final_dbpl = divida_bruta_pl.melt(var_name="Empresa", value_name="Divida_bruta_pl")
+    return df_final_dbpl, pl_ajustado
 
 def calculando_caixa(lista_de_empresas, bpa):
     #criar uma lógica para calcular o valor do 4t
@@ -553,7 +558,8 @@ def calculando_caixa(lista_de_empresas, bpa):
 
     df_caixa = pd.concat([df_caixa, caixa], axis=1)
     df_somado = df_caixa.sum().to_frame().T
-    return df_somado
+    df_final = df_somado.melt(var_name="Empresa", value_name="Caixa")
+    return df_final
 
 def calculando_liquidez_corrente(lista_de_empresas, n_empresas, bpa, bpp):
     #criar uma lógica para calcular o valor do 4t
@@ -603,10 +609,10 @@ def calculando_liquidez_corrente(lista_de_empresas, n_empresas, bpa, bpp):
             print(f"A empresa '{empresa}' não foi encontrada no DataFrame 'bpa'.")
     ativo_circ = ativo_circ.reset_index().drop(columns='index')
     passivo_circ = passivo_circ.reset_index().drop(columns='index')
-    print(ativo_circ)
-    print(passivo_circ)
+    
     liquidez_corrente = ativo_circ/passivo_circ
-    return liquidez_corrente
+    df_final = liquidez_corrente.melt(var_name="Empresa", value_name="Liquidez_corrente")
+    return df_final
 
 def calculando_ebit(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, trimestres):
 
@@ -626,15 +632,6 @@ def calculando_ebit(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, t
                 t2 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '04-01', dt_fim= '06-30')
                 t3 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
                 anual = calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas)
-                print(empresa)
-                print('t1')
-                print(t1)
-                print('t2')
-                print(t2)
-                print('t3')
-                print(t3)
-                print('anual')
-                print(anual)
                 receita_vendas_t4 = (
                     extrair_valor_por_conta(anual, 'Receita de Venda de Bens e/ou Serviços') -
                     (
@@ -690,7 +687,8 @@ def calculando_ebit(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, t
         df_resetado = df.reset_index()
         df_final = df_resetado.drop(columns=["index"])
         df_final = df_final.head(1)
-    return df_final
+        ebit = df_final.melt(var_name="Empresa", value_name="Ebit")
+    return ebit
 
 def calculando_roe(lista_de_empresas, n_empresas, bpp_trimestral_ano_anterior, bpp_trimestral_ano_corrente, 
                      dre_trimestral_ano_anterior, dre_trimestral_ano_corrente, dre_anual, bpp_anual):
@@ -742,11 +740,11 @@ def calculando_roe(lista_de_empresas, n_empresas, bpp_trimestral_ano_anterior, b
                     t3_para_t4 = calculando_dados_trimestrais(empresa, dre_trimestral_ano_anterior, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
                     anual_para_t4 = calculando_dados_anuais(empresa, dre_anual, ano, contas_desejadas)
                     t4 = (
-                            extrair_valor_por_conta(anual_para_t4, 'Atribuído a Sócios da Empresa Controladora') -
+                            extrair_valor_por_conta(anual_para_t4, contas_desejadas) -
                             (
-                                extrair_valor_por_conta(t1_para_t4, 'Atribuído a Sócios da Empresa Controladora') +
-                                extrair_valor_por_conta(t2_para_t4, 'Atribuído a Sócios da Empresa Controladora') +
-                                extrair_valor_por_conta(t3_para_t4, 'Atribuído a Sócios da Empresa Controladora')
+                                extrair_valor_por_conta(t1_para_t4, contas_desejadas) +
+                                extrair_valor_por_conta(t2_para_t4, contas_desejadas) +
+                                extrair_valor_por_conta(t3_para_t4, contas_desejadas)
                             )
                         )
                     periodo_resultado['t4'] = t4
@@ -831,16 +829,43 @@ def calculando_ebit_ano(lista_de_empresas, dre_trimestral_ano_anterior, dre_anua
         ebit_ano = df.drop(columns=['liq_t1', 'liq_t2', 'liq_t3', 'liq_t4'])
         return ebit_ano
   
-def calculando_ebit_ativo(ebit_ano, bpa, lista_de_empresas):
+def calculando_ebit_ativo(ebit_ano, bpa_trimestral, bpa_anual, lista_de_empresas, trimestres):
     
-    bpa = bpa.set_index("DENOM_CIA")
-    
+    contas_desejadas = [
+        'Ativo Total'
+    ]
+    bpa_trimestral = bpa_trimestral.set_index("DENOM_CIA")
     ebit_ativo = pd.DataFrame()
+    # resultados_lista = []
+    # ano, trim = trimestres[0].split("-")
+    # if trimestres[0] == f'{ano}-T4':
+        
+    #     for empresa in lista_de_empresas:
+    #         periodo_resultado = {'Empresa': empresa}
+    #         periodo_resultado['Empresa'] = empresa
+    #         t1_para_t4 = calculando_dados_trimestrais(empresa, bpa_trimestral, ano, contas_desejadas, dt_ini = '01-01', dt_fim= '03-31')
+    #         t2_para_t4 = calculando_dados_trimestrais(empresa, bpa_trimestral, ano, contas_desejadas, dt_ini = '04-01', dt_fim= '06-30')
+    #         t3_para_t4 = calculando_dados_trimestrais(empresa, bpa_trimestral, ano, contas_desejadas, dt_ini = '07-01', dt_fim= '09-30')
+    #         anual_para_t4 = calculando_dados_anuais(empresa, bpa_anual, ano, contas_desejadas)
+    #         t4 = (
+    #                 extrair_valor_por_conta(anual_para_t4, contas_desejadas) -
+    #                 (
+    #                     extrair_valor_por_conta(t1_para_t4, contas_desejadas) +
+    #                     extrair_valor_por_conta(t2_para_t4, contas_desejadas) +
+    #                     extrair_valor_por_conta(t3_para_t4, contas_desejadas)
+    #                 )
+    #             )
+    #         periodo_resultado['t4'] = t4
+    #         resultados_lista.append(periodo_resultado)
+    #     df = pd.DataFrame(resultados_lista)
+    #     df['ebit_ativo'] = ebit_ano['Ebit_ano']/df['t4']
+    #     a=1 
+    # else:
     for empresa in lista_de_empresas:
-        if empresa in bpa.index:
-            filtro = (bpa.index == empresa) & (bpa['DS_CONTA'] == 'Ativo Total')
+        if empresa in bpa_trimestral.index:
+            filtro = (bpa_trimestral.index == empresa) & (bpa_trimestral['DS_CONTA'] == 'Ativo Total')
             
-            dados_filtrados = bpa.loc[filtro, 'VL_AJUSTADO']
+            dados_filtrados = bpa_trimestral.loc[filtro, 'VL_AJUSTADO']
             
             if not dados_filtrados.empty:
                 ativo_total = dados_filtrados.iloc[-1]  # Pegar o último valor
@@ -850,13 +875,26 @@ def calculando_ebit_ativo(ebit_ano, bpa, lista_de_empresas):
                 continue
         else:
             print(f"A empresa '{empresa}' não foi encontrada no DataFrame 'bpa'.")
-    ebit_ativo.columns = lista_de_empresas
-    ebit_ativo_final = ebit_ano/ebit_ativo
-
-    return ebit_ativo_final
+    df_ebit_ativo = ebit_ativo.T.reset_index()
+    df_ebit_ativo.columns = ['Empresa', 'Ebit']
+    df_combinado = pd.merge(df_ebit_ativo, ebit_ano, on='Empresa')
+    df_combinado['Ebitda'] = df_combinado['Ebit_ano']/df_combinado['Ebit']
+    ebitda = df_combinado.drop(columns=['Ebit', 'Ebit_ano'])
+    return ebitda
 
 def calculando_roic(ebit_ano, pl_ajustado, divida_bruta_pl_df, caixa_ajustado):
-    roic = ebit_ano/(pl_ajustado+divida_bruta_pl_df+caixa_ajustado)
+    
+    pl = pl_ajustado.melt(var_name="Empresa", value_name="Margem_bruta")
+    df_combinado = pd.merge(ebit_ano, pl, on='Empresa', how='inner')
+    df_combinado = pd.merge(df_combinado, divida_bruta_pl_df, on='Empresa', how='inner')
+    df_combinado = pd.merge(df_combinado, caixa_ajustado, on='Empresa', how='inner')
+    df_combinado['Roic'] = df_combinado['Ebit_ano'] / (
+    df_combinado['Margem_bruta'] +
+    df_combinado['Divida_bruta_pl'] +
+    df_combinado['Caixa']
+)   
+    roic = df_combinado.drop(columns=['Ebit_ano', 'Margem_bruta', 'Divida_bruta_pl', 'Caixa'])
+    #roic['Roic'] = ebit_ano['Ebit_ano']/(pl['Margem_bruta']+divida_bruta_pl_df['Divida_bruta_pl']+caixa_ajustado['Caixa'])
     return roic
 
 
@@ -872,45 +910,45 @@ ano_anterior = '2024'
 lista_de_empresas, n_empresas, dre_anual, bpa_anual, bpp_anual, dre_trimestral_ano_anterior, bpa_trimestral_ano_anterior, bpp_trimestral_ano_anterior, dre_trimestral_ano_corrente, bpa_trimestral_ano_corrente, bpp_trimestral_ano_corrente = processando_arquivos(primeiro_trimestre, lista_cvm_ativos, ano_corrente, ano_anterior)
 
 ##################
-# margem_bruta = calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior, dre_anual, trimestres)
-# print('Margem Bruta:')
-# print(margem_bruta)
+margem_bruta = calculando_margem_bruta(lista_de_empresas, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior, dre_anual, trimestres)
+print('Margem Bruta:')
+print(margem_bruta)
 
-# margem_liquida = calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior)
-# print('Margem Liquida:')
-# print(margem_liquida)
+margem_liquida = calculando_margem_liquida(lista_de_empresas, trimestres, dre_trimestral_ano_corrente, dre_trimestral_ano_anterior)
+print('Margem Liquida:')
+print(margem_liquida)
 
-# divida_bruta_pl, pl_ajustado = calculando_divida_bruta_patrimonio_liquido(lista_de_empresas,n_empresas, bpp_trimestral_ano_anterior)
-# print('Divida_bruta:')
-# print(divida_bruta_pl)
+divida_bruta_pl, pl_ajustado = calculando_divida_bruta_patrimonio_liquido(lista_de_empresas,n_empresas, bpp_trimestral_ano_anterior)
+print('Divida_bruta:')
+print(divida_bruta_pl)
 
-# caixa = calculando_caixa(lista_de_empresas, bpa_trimestral_ano_anterior)
-# print('Caixa:')
-# print(caixa)
+caixa = calculando_caixa(lista_de_empresas, bpa_trimestral_ano_anterior)
+print('Caixa:')
+print(caixa)
 
-# liquidez_corrente = calculando_liquidez_corrente(lista_de_empresas,n_empresas, bpa_trimestral_ano_anterior, bpp_trimestral_ano_anterior)
-# print('Liquidez corrente:')
-# print(liquidez_corrente)
+liquidez_corrente = calculando_liquidez_corrente(lista_de_empresas,n_empresas, bpa_trimestral_ano_anterior, bpp_trimestral_ano_anterior)
+print('Liquidez corrente:')
+print(liquidez_corrente)
 
-# ebit = calculando_ebit(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, trimestres)
-# print('EBIT:')
-# print(ebit)
+ebit = calculando_ebit(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, trimestres)
+print('EBIT:')
+print(ebit)
 
-# roe = calculando_roe(lista_de_empresas, n_empresas, bpp_trimestral_ano_anterior, bpp_trimestral_ano_corrente, 
-#                      dre_trimestral_ano_anterior, dre_trimestral_ano_corrente, dre_anual, bpp_anual)
-# print('ROE:')
-# print(roe)
+roe = calculando_roe(lista_de_empresas, n_empresas, bpp_trimestral_ano_anterior, bpp_trimestral_ano_corrente, 
+                     dre_trimestral_ano_anterior, dre_trimestral_ano_corrente, dre_anual, bpp_anual)
+print('ROE:')
+print(roe)
 
 ebit_ano = calculando_ebit_ano(lista_de_empresas, dre_trimestral_ano_anterior, dre_anual, trimestres)
 print('EBIT ANO:')
 print(ebit_ano)
 
-# ebit_ativo = calculando_ebit_ativo(ebit_ano, bpa_trimestral_ano_corrente, lista_de_empresas)
-# print('EBIT ATIVO:')
-# print(ebit_ativo)
+ebit_ativo = calculando_ebit_ativo(ebit_ano, bpa_trimestral_ano_anterior, bpa_anual, lista_de_empresas, trimestres)
+print('EBIT ATIVO:')
+print(ebit_ativo)
 
-# roic = calculando_roic(ebit_ano, pl_ajustado, divida_bruta_pl, caixa)
-# print('ROIC:')
-# print(roic)
+roic = calculando_roic(ebit_ano, pl_ajustado, divida_bruta_pl, caixa)
+print('ROIC:')
+print(roic)
 print('O tempo de execução desse programa foi de %s segundos---' % (time.time() - start_time))
 
