@@ -892,7 +892,7 @@ def calculando_roic(ebit_ano, pl_ajustado, divida_bruta_pl_df, caixa_ajustado):
     df_combinado['Margem_bruta'] +
     df_combinado['Divida_bruta_pl'] +
     df_combinado['Caixa']
-)   
+    )   
     roic = df_combinado.drop(columns=['Ebit_ano', 'Margem_bruta', 'Divida_bruta_pl', 'Caixa'])
     #roic['Roic'] = ebit_ano['Ebit_ano']/(pl['Margem_bruta']+divida_bruta_pl_df['Divida_bruta_pl']+caixa_ajustado['Caixa'])
     return roic
