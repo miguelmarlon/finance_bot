@@ -13,6 +13,7 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from datetime import date
+from agente_ia import send_message
 
 def filtrar_e_organizar_arquivos(arquivos, padroes):
     """
@@ -897,6 +898,16 @@ def calculando_roic(ebit_ano, pl_ajustado, divida_bruta_pl_df, caixa_ajustado):
     #roic['Roic'] = ebit_ano['Ebit_ano']/(pl['Margem_bruta']+divida_bruta_pl_df['Divida_bruta_pl']+caixa_ajustado['Caixa'])
     return roic
 
+def dataframe_to_text_func_teste(df):
+    text = ""
+    for _, row in df.iterrows():
+        text += f"{row['Empresa']}:\n"
+        for col in df.columns:
+            if col != "Empresa":
+                text += f"  - {col}: {row[col]}\n"
+        text += "\n"
+    return text
+
 
 start_time = time.time()
 
@@ -950,5 +961,26 @@ print(ebit_ativo)
 roic = calculando_roic(ebit_ano, pl_ajustado, divida_bruta_pl, caixa)
 print('ROIC:')
 print(roic)
-print('O tempo de execução desse programa foi de %s segundos---' % (time.time() - start_time))
 
+
+df_consolidado = margem_bruta
+df_consolidado = df_consolidado.merge(margem_liquida, on="Empresa")
+df_consolidado = df_consolidado.merge(divida_bruta_pl, on="Empresa")
+df_consolidado = df_consolidado.merge(caixa, on="Empresa")
+df_consolidado = df_consolidado.merge(liquidez_corrente, on="Empresa")
+df_consolidado = df_consolidado.merge(ebit, on="Empresa")
+df_consolidado = df_consolidado.merge(roe, on="Empresa")
+df_consolidado = df_consolidado.merge(ebit_ano, on="Empresa")
+df_consolidado = df_consolidado.merge(ebit_ativo, on="Empresa")
+df_consolidado = df_consolidado.merge(roic, on="Empresa")
+
+descricao_textual = dataframe_to_text_func_teste(df_consolidado)
+
+prompt = """
+Com base nos seguintes dados financeiros, indique qual a melhor empresa:
+
+""" + descricao_textual
+response = send_message(prompt, sistema="Você é um analista financeiro especializado em avaliação de empresas.", json_format=False)
+print(response)
+
+print('O tempo de execução desse programa foi de %s segundos---' % (time.time() - start_time))
